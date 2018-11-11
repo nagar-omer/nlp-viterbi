@@ -2,22 +2,24 @@ import numpy as np
 from loggers import PrintLogger
 
 START = "START"
+PREF = 3
+SUFF = 3
 
 
 class MleEstimator:
-    def __init__(self, source_file, num_suffix=100, delta=(0.34, 0.33, 0.33)):
+    def __init__(self, source_file, num_prefix=200, num_suffix=200, delta=(0.4, 0.35, 0.25)):
         self._logger = PrintLogger("NLP-ass1")
         self._delta = delta
         self._source = source_file
+        self._num_prefix = num_prefix
         self._num_suffix = num_suffix
         # counters
-        self._emmision_count, self._transition_count, self._bigram_suffix_count, self._unigram_suffix_count = \
-            self._get_data()
-        self._pos_list = list(set(list(self._transition_count[0].keys()) + [START] ))
+        self._emmision_count, self._transition_count, self._prefix_count, self._suffix_count = self._get_data()
+        self._pos_list = list(set(list(self._transition_count[0].keys()) + [START]))
         self._num_pos = len(self._pos_list)
         self._pos_idx = {pos: i for i, pos in enumerate(self._pos_list)}
         # probabilities
-        self._emmision, self._transition, self._suffix_bi, self._suffix_uni = self._calc_probabilities()
+        self._emmision, self._transition, self._prefix, self._suffix = self._calc_probabilities()
 
     def _get_data(self):
         self._logger.info("get-data - start")
@@ -25,8 +27,8 @@ class MleEstimator:
         t1 = START
         t2 = START
         emmision = {}
-        suffix_bi = {}
-        suffix_uni = {}
+        prefix = {}
+        suffix = {}
         src_file = open(self._source, "rt")                                          # open file
         for line in src_file:
             # ---------- BREAK -----------
@@ -37,21 +39,22 @@ class MleEstimator:
             for i, (word, pos) in enumerate(w_pos):
                 # -------- EMISSION ----------
                 emmision[(word, pos)] = emmision.get((word, pos), 0) + 1             # count (word, POS)++
-                # --------- SUFFIX -----------
-                if len(word) > 1:
-                    suffix_bi[(word[-2:], pos)] = suffix_bi.get((word[-2:], pos), 0) + 1     # count bigram suffixes
-                    suffix_uni[(word[-1:], pos)] = suffix_uni.get((word[-1:], pos), 0) + 1   # count unigram suffixes
+                # --------- PREFIX -----------
+                prefix[(word[:PREF], pos)] = prefix.get((word[:PREF], pos), 0) + 1    # count bigram prefixes
+                suffix[(word[-SUFF:], pos)] = prefix.get((word[-SUFF:], pos), 0) + 1  # count bigram prefixes
                 # ------- TRANSITION ---------
                 transition[0][pos] = transition[0].get(pos, 0) + 1                      # count(POS)
                 transition[1][(t1, pos)] = transition[1].get((t1, pos), 0) + 1          # count(POS_1, POS_2)
                 transition[2][(t2, t1, pos)] = transition[2].get((t2, t1, pos), 0) + 1  # count(POS_0, POS_1, POS_2)
                 t2 = t1
                 t1 = pos
-        suffix_bi = {sufi: pos for i, (sufi, pos) in enumerate(sorted(suffix_bi.items(), key=lambda x: -x[1]))
-                     if i < self._num_suffix}
-        # take K most common suffixes
+        prefix = {pre: pos for i, (pre, pos) in enumerate(sorted(prefix.items(), key=lambda x: -x[1]))
+                  if i < self._num_prefix}
+        suffix = {pre: pos for i, (pre, pos) in enumerate(sorted(suffix.items(), key=lambda x: -x[1]))
+                  if i < self._num_suffix}
+        # take K most common prefixes
         self._logger.info("get-data - end")
-        return emmision, transition, suffix_bi, suffix_uni
+        return emmision, transition, prefix, suffix
 
     @staticmethod
     def _my_log(x):
@@ -71,14 +74,13 @@ class MleEstimator:
         emmision_prob = {(word, pos): w_p_count / self._transition_count[0][pos] for (word, pos), w_p_count
                          in self._emmision_count.items()}
 
-        # --------- SUFFIX -----------
+        # --------- PREFIX -----------
         # given word [w_1, w_2 , ... , w_n-1, w_n]
         # e(w_n-1, w_n| pos)
+        prefix_bi_prob = {(pre, pos): s_p_count / self._transition_count[0][pos] for (pre, pos), s_p_count
+                          in self._prefix_count.items()}
         suffix_bi_prob = {(sufi, pos): s_p_count / self._transition_count[0][pos] for (sufi, pos), s_p_count
-                          in self._bigram_suffix_count.items()}
-        # e(w_n| pos)
-        suffix_uni_prob = {(sufi, pos): s_p_count / self._transition_count[0][pos] for (sufi, pos), s_p_count
-                           in self._unigram_suffix_count.items()}
+                          in self._suffix_count.items()}
 
         # ------- TRANSITION ---------
         sum_words = np.sum(list(self._transition_count[0].values()))
@@ -94,7 +96,7 @@ class MleEstimator:
                               for (pos2, pos1, pos0), count in self._transition_count[2].items()
                               if (pos2, pos1) in self._transition_count[1]}
         self._logger.info("calc-probabilities - end")
-        return emmision_prob, transition_prob, suffix_bi_prob, suffix_uni_prob
+        return emmision_prob, transition_prob, prefix_bi_prob, suffix_bi_prob
 
     def emmision(self, word_pos: tuple, log=False):
         # break
@@ -103,17 +105,13 @@ class MleEstimator:
         if (word, pos) in self._emmision:
             return self._my_log(self._emmision[word_pos]) if log else self._emmision[word_pos]
         # if not then check if there is a value e(w_n-1, w_n| pos)
-        bigram = word[-2:]
-        if (bigram, pos) in self._suffix_bi:
-            return self._my_log(self._suffix_bi[(bigram, pos)]) if log else self._suffix_bi[(bigram, pos)]
-        # if not then check if there is a value e(w_n| pos)
-        unigram = word[-1:]
-        if (bigram, pos) in self._suffix_uni:
-            return self._my_log(self._suffix_uni[(unigram, pos)]) if log else self._suffix_uni[(unigram, pos)]
-        # else we have a problem!!
-        else:
-            # print("ERROR: can't generate emmision for - e(" + word + "| " + pos + ")")
-            return self._my_log(0) if log else 0
+        suf = word[-SUFF:]
+        if (suf, pos) in self._suffix:
+            return self._my_log(self._suffix[(suf, pos)]) if log else self._suffix[(suf, pos)]
+        pref = word[:PREF]
+        if (pref, pos) in self._prefix:
+            return self._my_log(self._prefix[(pref, pos)]) if log else self._prefix[(pref, pos)]
+        return self._my_log(0) if log else 0
 
     def transition(self, pos_sequence: tuple, log=False):
         # break sequence
@@ -131,10 +129,10 @@ class MleEstimator:
         out_e = open(e_mle_path, "wt")
         out_e.writelines([word + " " + pos + "\t" + str(count) + "\n" for (word, pos), count
                           in self._emmision_count.items()])
+        out_e.writelines(["^" + pref + " " + pos + "\t" + str(count) + "\n" for (pref, pos), count
+                          in self._prefix_count.items()])
         out_e.writelines(["^" + sufi + " " + pos + "\t" + str(count) + "\n" for (sufi, pos), count
-                          in self._bigram_suffix_count.items()])
-        out_e.writelines(["^" + sufi + " " + pos + "\t" + str(count) + "\n" for (sufi, pos), count
-                          in self._unigram_suffix_count.items()])
+                          in self._suffix_count.items()])
         out_e.close()
         self._logger.info("writing q_mle...")
         out_q = open(q_mle_path, "wt")
@@ -171,7 +169,7 @@ class MleEstimator:
         self._logger.info("Viterbi - BACKWARDS...")
         # ------- REPRODUCTION / BACKWARDS ---------
         # find max and arg max at v_max[last_layer]
-        max_val = 0
+        max_val = self._my_log(0) if log else 0
         max_i = 0
         max_j = 0
         for i in range(self._num_pos):
