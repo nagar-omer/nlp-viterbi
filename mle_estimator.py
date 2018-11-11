@@ -5,7 +5,7 @@ START = "START"
 
 
 class MleEstimator:
-    def __init__(self, source_file, num_suffix=100, delta=(0.4, 0.4, 0.2)):
+    def __init__(self, source_file, num_suffix=100, delta=(0.34, 0.33, 0.33)):
         self._logger = PrintLogger("NLP-ass1")
         self._delta = delta
         self._source = source_file
@@ -113,7 +113,7 @@ class MleEstimator:
         # else we have a problem!!
         else:
             # print("ERROR: can't generate emmision for - e(" + word + "| " + pos + ")")
-            return 0
+            return self._my_log(0) if log else 0
 
     def transition(self, pos_sequence: tuple, log=False):
         # break sequence
@@ -124,11 +124,7 @@ class MleEstimator:
         tran_0 = self._delta[0] * self._transition[0].get(pos0, 0)
         tran_1 = self._delta[1] * self._transition[1].get((pos1, pos0), 0)
         tran_2 = self._delta[2] * self._transition[2].get((pos2, pos1, pos0), 0) if pos2 else 0
-        if log:
-            tran_0 = self._my_log(tran_0)
-            tran_1 = self._my_log(tran_1)
-            tran_2 = self._my_log(tran_2)
-        return tran_2 + tran_1 + tran_0
+        return self._my_log(tran_2 + tran_1 + tran_0) if log else tran_2 + tran_1 + tran_0
 
     def mle_count_to_txt(self, e_mle_path, q_mle_path):
         self._logger.info("writing e_mle...")
@@ -151,19 +147,21 @@ class MleEstimator:
 
     def pred_viterbi(self, sequence, log=False):
         self._logger.info("Viterbi - START...")
-        len_seq = len(sequence) + 1
-        v_mx = [[[(0, (-1, self._pos_idx[START], self._pos_idx[START])) for _ in range(self._num_pos)] for _ in
-                 range(self._num_pos)] for _ in range(len_seq)]
         self._logger.info("Viterbi - INITIALIZATION...")
         # ------------ INITIALIZATION --------------
+        len_seq = len(sequence) + 1
+        base_score = self._my_log(0) if log else 0
+        v_mx = [[[(base_score, (-1, self._pos_idx[START], self._pos_idx[START])) for _ in range(self._num_pos)] for _ in
+                 range(self._num_pos)] for _ in range(len_seq)]
         bp = (-1, self._pos_idx[START], self._pos_idx[START])
-        v_mx[0][self._pos_idx[START]][self._pos_idx[START]] = (1, bp)
+        base_score = self._my_log(1) if log else 1
+        v_mx[0][self._pos_idx[START]][self._pos_idx[START]] = (base_score, bp)
 
         self._logger.info("Viterbi - FORWARD...")
         # ------- RECURSIVE STEP / FORWARD ---------
-        print("Viterbi - forward word ", end="")
+        print("Viterbi - forward: " + str(sequence) + "\nProgress:          ", end="")
         for i in range(1, len_seq):
-            print(".", end="")
+            print("." * (len(sequence[i-1]) + 3) + "|", end="")
             for j, pos2 in enumerate(self._pos_list):
                 for k, pos1 in enumerate(self._pos_list):
                     score, bp = self._max_and_bp(v_mx, i, sequence[i - 1], j, pos2, pos1, log=log)
@@ -219,12 +217,11 @@ if __name__ == "__main__":
             word, pos = w_p.rsplit("/", 1)
             seq.append(word)
             label.append(pos)
-        pred = mm.pred_viterbi(seq)          # predict
+        pred = mm.pred_viterbi(seq, log=True)          # predict
 
         # print results
         identical = sum([1 for p, l in zip(pred, label) if p == l])
-        recall = "{:1.4f}".format(identical/len(pred))
-        print(line)
+        recall = str(int(identical/len(pred) * 100))
         print("pred: " + str(pred) + "\nlabel: " + str(label) +
               "\nrecall:\t" + str(identical) + "/" + str(len(pred)) + "\t~" + recall + "%")
 
