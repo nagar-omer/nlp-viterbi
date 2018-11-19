@@ -3,13 +3,15 @@ from loggers import PrintLogger
 
 START = "START"
 PREF = 3
-SUFF = 3
+SUFF = 4
+CUT = 0.5
 
 
 class MleEstimator:
-    def __init__(self, source_file, num_prefix=200, num_suffix=200, delta=(0.4, 0.35, 0.25)):
+    def __init__(self, source_file, num_prefix=120, num_suffix=200, delta=(0.2, 0.5, 0.3), gamma=(1, 1)):
         self._logger = PrintLogger("NLP-ass1")
         self._delta = delta
+        self._gamma = gamma
         self._source = source_file
         self._num_prefix = num_prefix
         self._num_suffix = num_suffix
@@ -71,28 +73,28 @@ class MleEstimator:
 
         # -------- EMISSION ----------
         # e(word| pos)
-        emmision_prob = {(word, pos): w_p_count / self._transition_count[0][pos] for (word, pos), w_p_count
+        emmision_prob = {(word, pos): ((1-CUT) * w_p_count / self._transition_count[0][pos]) + CUT for (word, pos), w_p_count
                          in self._emmision_count.items()}
 
         # --------- PREFIX -----------
         # given word [w_1, w_2 , ... , w_n-1, w_n]
         # e(w_n-1, w_n| pos)
-        prefix_bi_prob = {(pre, pos): s_p_count / self._transition_count[0][pos] for (pre, pos), s_p_count
+        prefix_bi_prob = {(pre, pos): ((1-CUT) * s_p_count / self._transition_count[0][pos]) + CUT for (pre, pos), s_p_count
                           in self._prefix_count.items()}
-        suffix_bi_prob = {(sufi, pos): s_p_count / self._transition_count[0][pos] for (sufi, pos), s_p_count
+        suffix_bi_prob = {(sufi, pos): ((1-CUT) * s_p_count / self._transition_count[0][pos]) + CUT for (sufi, pos), s_p_count
                           in self._suffix_count.items()}
 
         # ------- TRANSITION ---------
         sum_words = np.sum(list(self._transition_count[0].values()))
         # sequence = [pos2, pos1, pos0]
         # q(pos0)
-        transition_prob[0] = {pos: pos_count/sum_words for pos, pos_count in self._transition_count[0].items()}
+        transition_prob[0] = {pos: ((1-CUT) * pos_count/sum_words) + CUT for pos, pos_count in self._transition_count[0].items()}
         # q(pos0| pos1)
-        transition_prob[1] = {(pos1, pos0): count / self._transition_count[0][pos1]
+        transition_prob[1] = {(pos1, pos0): ((1-CUT) * count / self._transition_count[0][pos1]) + CUT
                               for (pos1, pos0), count in self._transition_count[1].items()
                               if pos1 in self._transition_count[0]}
         # q(pos0| pos2, pos1)
-        transition_prob[2] = {(pos2, pos1, pos0): count / self._transition_count[1][(pos2, pos1)]
+        transition_prob[2] = {(pos2, pos1, pos0): ((1-CUT) * count / self._transition_count[1][(pos2, pos1)]) + CUT
                               for (pos2, pos1, pos0), count in self._transition_count[2].items()
                               if (pos2, pos1) in self._transition_count[1]}
         self._logger.info("calc-probabilities - end")
@@ -104,13 +106,14 @@ class MleEstimator:
         # if there is a value e(word| vec)
         if (word, pos) in self._emmision:
             return self._my_log(self._emmision[word_pos]) if log else self._emmision[word_pos]
+        # if not then check if there is a value e(w_1, w_2| pos)
+        pref = word[:PREF]
+        if (pref, pos) in self._prefix:
+            return self._my_log(self._prefix[(pref, pos)]) if log else self._prefix[(pref, pos)]
         # if not then check if there is a value e(w_n-1, w_n| pos)
         suf = word[-SUFF:]
         if (suf, pos) in self._suffix:
             return self._my_log(self._suffix[(suf, pos)]) if log else self._suffix[(suf, pos)]
-        pref = word[:PREF]
-        if (pref, pos) in self._prefix:
-            return self._my_log(self._prefix[(pref, pos)]) if log else self._prefix[(pref, pos)]
         return self._my_log(0) if log else 0
 
     def transition(self, pos_sequence: tuple, log=False):
@@ -194,8 +197,9 @@ class MleEstimator:
         # we want to maximize w_n is pos1 coming after a pos2 word
         # scores = V(w_n-1, pos_i, pos2) * q(pos1| pos_i, pos2) * e(w_n| pos1)  i = 0..num_pos
         if log:
-            scores = [v_mx[word_idx - 1][i][pos2_idx][0] + self.transition((self._pos_list[i], pos2, pos1), log=log) +
-                      self.emmision((word, pos1), log=log) for i in range(self._num_pos)]
+            scores = [v_mx[word_idx - 1][i][pos2_idx][0] +
+                      (self._gamma[1] * self.transition((self._pos_list[i], pos2, pos1), log=log) + self._gamma[0] *
+                       self.emmision((word, pos1), log=log)) for i in range(self._num_pos)]
         else:
             scores = [v_mx[word_idx-1][i][pos2_idx][0] * self.transition((self._pos_list[i], pos2, pos1), log=log) *
                       self.emmision((word, pos1), log=log) for i in range(self._num_pos)]
