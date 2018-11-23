@@ -40,7 +40,10 @@ class ViterbiAlg:
             print("." * (len(sequence[i-1]) + 3) + "|", end="")
             for j, pos2 in enumerate(self._pos_list):
                 for k, pos1 in enumerate(self._pos_list):
-                    score, bp = self._max_and_bp(sequence, v_mx, i-1, pos2, pos1, log=log)
+                    if pos1 == START:
+                        score, bp = (v_mx[i - 1][0][j][0] + self._my_log(0) if log else 0), 0
+                    else:
+                        score, bp = self._max_and_bp(sequence, v_mx, i-1, pos2, pos1, log=log)
                     bp = (i - 1, bp, j)
                     v_mx[i][j][k] = (score, bp)
         print(" -- forward completed --")
@@ -71,7 +74,7 @@ class ViterbiAlg:
         # given a word w_n and pos2, pos1
         # we want to maximize w_n is pos1 coming after a pos2 word
         # scores = V(w_n-1, pos_i, pos2) * q(pos1| pos_i, pos2) * e(w_n| pos1)  i = 0..num_pos
-        from_row = [v_mx[word_idx - 1][i][self._pos_idx[pos2]][0] for i in range(self._num_pos)]
+        from_row = [v_mx[word_idx][i][self._pos_idx[pos2]][0] for i in range(self._num_pos)]
 
         max_score, argmax_score = self._prob_func(sequence, word_idx, from_row, pos2, pos1, log=log)
         return max_score, argmax_score

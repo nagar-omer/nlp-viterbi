@@ -1,5 +1,9 @@
 import os
+import sys
+sys.path.insert(0, os.path.join(__file__.replace("/", os.sep).rsplit(os.sep, 1)[0], ".."))
 from utils.ftr_builders import TransitionFtr, EmmisionFtr, SuffixPrefix, CombinationsWordsPos, CostumeFtr
+
+
 FTR_SIZE = 5000
 START = "START"
 
@@ -48,4 +52,8 @@ def create_ftr_file_for(src, out_name):
 
 
 if __name__ == "__main__":
-    create_ftr_file_for(os.path.join("..", "data", "ass1-tagger-train"), "ouuut.txt")
+    args = sys.argv
+    if len(args) < 2:
+        print("input\t\tExtractFeatures corpus_file features_file")
+    # create_ftr_file_for(os.path.join("..", "data", "ass1-tagger-train"), "ouuut.txt")
+    create_ftr_file_for(args[0], args[1])

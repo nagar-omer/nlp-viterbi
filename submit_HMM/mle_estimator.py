@@ -147,6 +147,10 @@ class MleEstimator:
         out_q.close()
 
     def prob_func(self, word_sequence, curr_word_idx, src_prob_row, prev_POS, curr_POS, log=True):
+        if curr_POS == START:
+            return -200 if log else 0, 0
+
+        _0_3 = self._my_log(0.5) if log else 0.3
         # given a word w_n and pos2, pos1
         # we want to maximize w_n is pos1 coming after a pos2 word
         # scores = V(w_n-1, pos_i, pos2) * q(pos1| pos_i, pos2) * e(w_n| pos1)  i = 0..num_pos
@@ -156,7 +160,9 @@ class MleEstimator:
             else:
                 good_chance = list(range(len(src_prob_row)))
             scores = {i: src_prob_row[i] + self.transition((self._pos_list[i], prev_POS, curr_POS), log=log) +
-                      self.emmision((word_sequence[curr_word_idx], curr_POS), log=log) for i in good_chance}
+                      self.emmision((word_sequence[curr_word_idx], curr_POS), log=log)
+                      for ii, i in enumerate(good_chance) if ii < 3 or
+                      self.emmision((word_sequence[curr_word_idx], curr_POS)) > _0_3}
         else:
             scores = [src_prob_row[i] * self.transition((self._pos_list[i], prev_POS, curr_POS), log=log) *
                       self.emmision((word_sequence[curr_word_idx], curr_POS), log=log) for i in range(self._num_pos)]
