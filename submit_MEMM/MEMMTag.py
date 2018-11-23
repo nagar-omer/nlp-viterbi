@@ -6,17 +6,15 @@ import numpy as np
 from utils.data_loader import DataLoader
 from utils.ftr_builders import TransitionFtr, EmmisionFtr, SuffixPrefix, CombinationsWordsPos, CostumeFtr
 from utils.viterbi import ViterbiAlg
-
-START = "START"
-SIZE_FTR = 5000
+from utils.params import LEN_FTR, START
 
 
 class MEMMTagger:
     def __init__(self, to_pred, model_file, feature_map, out_name="greedy_pred"):
         self._probs = {}
         self._model = pickle.load(open(model_file, "rb"))
-        ftr_builders = [TransitionFtr(out_dim=SIZE_FTR), EmmisionFtr(out_dim=SIZE_FTR), SuffixPrefix(out_dim=SIZE_FTR),
-                        CombinationsWordsPos(out_dim=SIZE_FTR), CostumeFtr()]
+        ftr_builders = [TransitionFtr(out_dim=LEN_FTR), EmmisionFtr(out_dim=LEN_FTR), SuffixPrefix(out_dim=LEN_FTR),
+                        CombinationsWordsPos(out_dim=LEN_FTR), CostumeFtr()]
         self._dl = DataLoader(to_pred, feature_map, ftr_builders)
         self._label_list = self._dl.label_list + [START]
         self._label_to_idx = {label: i for i, label in enumerate(self._label_list)}
@@ -46,7 +44,7 @@ class MEMMTagger:
                 self._probs[str(([prev_prev_pos, prev_POS], words))] = \
                     self._model.predict_proba(sparse_vec)[0]
 
-            if ii < 3 or self._probs[str(([prev_prev_pos, prev_POS], words))][self._label_to_idx[curr_POS]] > 0.5:
+            if ii < 3 or self._probs[str(([prev_prev_pos, prev_POS], words))][self._label_to_idx[curr_POS]] > 0.2:
                 scores[prev_prev_pos] = \
                     self._probs[str(([prev_prev_pos, prev_POS], words))][self._label_to_idx[curr_POS]]
 
@@ -118,7 +116,7 @@ class MEMMTagger:
 
 if __name__ == "__main__":
     args = sys.argv
-    if len(args) < 4:
-        print("input\t\tinput_file_name, modelname, feature_map_file, out_file_name")
-    MEMMTagger(args[0], args[1], args[2]).memm_tag(out_name=args[3])
+    if len(args) < 5:
+        print("input\t\tinput_file_name,\t modelname,\t feature_map_file,\t out_file_name\n\n")
+    MEMMTagger(args[1], args[2], args[3]).memm_tag(out_name=args[4])
 

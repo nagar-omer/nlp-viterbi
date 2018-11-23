@@ -4,17 +4,15 @@ sys.path.insert(0, os.path.join(__file__.replace("/", os.sep).rsplit(os.sep, 1)[
 import pickle
 from utils.data_loader import DataLoader
 from utils.ftr_builders import TransitionFtr, CombinationsWordsPos, EmmisionFtr, CostumeFtr, SuffixPrefix
-
-START = "START"
-SIZE_FTR = 5000
+from utils.params import LEN_FTR, START
 
 
 def greedy_tag(to_pred, model_file, feature_map, out_name="greedy_pred"):
     out_file = open(out_name, "wt")
 
     model = pickle.load(open(model_file, "rb"))
-    ftr_builders = [TransitionFtr(out_dim=SIZE_FTR), EmmisionFtr(out_dim=SIZE_FTR), SuffixPrefix(out_dim=SIZE_FTR),
-                    CombinationsWordsPos(out_dim=SIZE_FTR), CostumeFtr()]
+    ftr_builders = [TransitionFtr(out_dim=LEN_FTR), EmmisionFtr(out_dim=LEN_FTR), SuffixPrefix(out_dim=LEN_FTR),
+                    CombinationsWordsPos(out_dim=LEN_FTR), CostumeFtr()]
     dl = DataLoader(to_pred, feature_map, ftr_builders)
 
     all_count = 0
@@ -40,7 +38,7 @@ def greedy_tag(to_pred, model_file, feature_map, out_name="greedy_pred"):
 if __name__ == "__main__":
     # greedy_tag("../data/ass1-tagger-test", "model_file", "map_file")
     args = sys.argv
-    if len(args) < 4:
-        print("input\t\tinput_file_name, modelname, feature_map_file, out_file_name")
-    greedy_tag(args[0], args[1], args[2], out_name=args[3])
+    if len(args) < 5:
+        print("input\t\tinput_file_name,\t modelname,\t feature_map_file,\t out_file_name\n\n")
+    greedy_tag(args[1], args[2], args[3], out_name=args[4])
 

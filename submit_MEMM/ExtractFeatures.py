@@ -1,11 +1,8 @@
 import os
 import sys
 sys.path.insert(0, os.path.join(__file__.replace("/", os.sep).rsplit(os.sep, 1)[0], ".."))
+from utils.params import LEN_FTR,START
 from utils.ftr_builders import TransitionFtr, EmmisionFtr, SuffixPrefix, CombinationsWordsPos, CostumeFtr
-
-
-FTR_SIZE = 5000
-START = "START"
 
 
 class FeatureExtractor:
@@ -45,15 +42,15 @@ class FeatureExtractor:
 
 
 def create_ftr_file_for(src, out_name):
-    builders = [TransitionFtr(out_dim=FTR_SIZE), EmmisionFtr(out_dim=FTR_SIZE), SuffixPrefix(out_dim=FTR_SIZE),
-                CombinationsWordsPos(out_dim=FTR_SIZE), CostumeFtr()]
+    builders = [TransitionFtr(out_dim=LEN_FTR), EmmisionFtr(out_dim=LEN_FTR), SuffixPrefix(out_dim=LEN_FTR),
+                CombinationsWordsPos(out_dim=LEN_FTR), CostumeFtr()]
     mm = FeatureExtractor(builders)
     mm.create_ftr_file_for(src, out_name=out_name)
 
 
 if __name__ == "__main__":
     args = sys.argv
-    if len(args) < 2:
-        print("input\t\tExtractFeatures corpus_file features_file")
+    if len(args) < 3:
+        print("input\t\tExtractFeatures,\t corpus_file,\t features_file\n\n")
     # create_ftr_file_for(os.path.join("..", "data", "ass1-tagger-train"), "ouuut.txt")
-    create_ftr_file_for(args[0], args[1])
+    create_ftr_file_for(args[1], args[2])

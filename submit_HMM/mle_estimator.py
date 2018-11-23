@@ -1,8 +1,8 @@
 import numpy as np
-from loggers import PrintLogger
+
+from utils.params import START
 from utils.viterbi import ViterbiAlg
 
-START = "START"
 PREF = 3
 SUFF = 4
 CUT = 0.5
@@ -10,7 +10,6 @@ CUT = 0.5
 
 class MleEstimator:
     def __init__(self, source_file, num_prefix=120, num_suffix=200, delta=(0.2, 0.5, 0.3)):
-        self._logger = PrintLogger("NLP-ass1")
         self._delta = delta
         self._source = source_file
         self._num_prefix = num_prefix
@@ -24,7 +23,7 @@ class MleEstimator:
         self._emmision, self._transition, self._prefix, self._suffix = self._calc_probabilities()
 
     def _get_data(self):
-        self._logger.info("get-data - start")
+        print("get-data - start")
         transition = {0: {}, 1: {}, 2: {}}
         t1 = START
         t2 = START
@@ -55,7 +54,7 @@ class MleEstimator:
         suffix = {pre: pos for i, (pre, pos) in enumerate(sorted(suffix.items(), key=lambda x: -x[1]))
                   if i < self._num_suffix}
         # take K most common prefixes
-        self._logger.info("get-data - end")
+        print("get-data - end")
         return emmision, transition, prefix, suffix
 
     @staticmethod
@@ -68,7 +67,7 @@ class MleEstimator:
             return np.log(x)
 
     def _calc_probabilities(self):
-        self._logger.info("calc-probabilities - start")
+        print("calc-probabilities - start")
         transition_prob = {}
 
         # -------- EMISSION ----------
@@ -97,7 +96,7 @@ class MleEstimator:
         transition_prob[2] = {(pos2, pos1, pos0): ((1-CUT) * count / self._transition_count[1][(pos2, pos1)]) + CUT
                               for (pos2, pos1, pos0), count in self._transition_count[2].items()
                               if (pos2, pos1) in self._transition_count[1]}
-        self._logger.info("calc-probabilities - end")
+        print("calc-probabilities - end")
         return emmision_prob, transition_prob, prefix_bi_prob, suffix_bi_prob
 
     def emmision(self, word_pos: tuple, log=False):
@@ -128,7 +127,7 @@ class MleEstimator:
         return self._my_log(tran_2 + tran_1 + tran_0) if log else tran_2 + tran_1 + tran_0
 
     def mle_count_to_txt(self, e_mle_path, q_mle_path):
-        self._logger.info("writing e_mle...")
+        print("writing e_mle...")
         out_e = open(e_mle_path, "wt")
         out_e.writelines([word + " " + pos + "\t" + str(count) + "\n" for (word, pos), count
                           in self._emmision_count.items()])
@@ -137,7 +136,7 @@ class MleEstimator:
         out_e.writelines(["^" + sufi + " " + pos + "\t" + str(count) + "\n" for (sufi, pos), count
                           in self._suffix_count.items()])
         out_e.close()
-        self._logger.info("writing q_mle...")
+        print("writing q_mle...")
         out_q = open(q_mle_path, "wt")
         out_q.writelines([pos + "\t" + str(count) + "\n" for pos, count in self._transition_count[0].items()])
         out_q.writelines([pos1 + " " + pos0 + "\t" + str(count) + "\n" for (pos1, pos0), count
