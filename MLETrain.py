@@ -127,7 +127,12 @@ class MleExtractor:
         self._emission, self._transition, self._suffix = calc_probabilities(self._transition_count, self._emission_count, self._suffix_count)
         self._pos_list = list(set(list(self._transition_count[0].keys()) + [START]))
 
+
     def prob_func(self, word_sequence, curr_word_idx, src_prob_row, prev_POS, curr_POS, log=True):
+        if curr_POS == START:
+            return -200 if log else 0, 0
+
+        _0_3 = my_log(0.5) if log else 0.3
         # given a word w_n and pos2, pos1
         # we want to maximize w_n is pos1 coming after a pos2 word
         # scores = V(w_n-1, pos_i, pos2) * q(pos1| pos_i, pos2) * e(w_n| pos1)  i = 0..num_pos
@@ -136,13 +141,13 @@ class MleExtractor:
                 good_chance = np.argsort(src_prob_row)[-8:]
             else:
                 good_chance = list(range(len(src_prob_row)))
-            scores = {
-            i: src_prob_row[i] + transition((self._pos_list[i], prev_POS, curr_POS), self._transition, self._transition_lambdas, log=log) +
-               emission((word_sequence[curr_word_idx], curr_POS), self._emission, self._suffix, log=log) for i in good_chance}
+            scores = {i: src_prob_row[i] + transition((self._pos_list[i], prev_POS, curr_POS), self._transition, self._transition_lambdas, log=log) +
+                         emission((word_sequence[curr_word_idx], curr_POS), self._emission, self._suffix, log=log)
+                      for ii, i in enumerate(good_chance) if ii < 3 or
+                      emission((word_sequence[curr_word_idx], curr_POS), self._emission, self._suffix, log=log) > _0_3}
         else:
-            scores = [src_prob_row[i] * transition((self._pos_list[i], prev_POS, curr_POS), self._transition, self._transition_lambdas, log=log) *
-                      emission((word_sequence[curr_word_idx], curr_POS), self._emission, self._suffix, log=log) for i in
-                      range(self._num_pos)]
+            scores = [src_prob_row[i] * self.transition((self._pos_list[i], prev_POS, curr_POS),  self._transition, self._transition_lambdas, log=log) *
+                      emission((word_sequence[curr_word_idx], curr_POS), self._emission, self._suffix, log=log) for i in range(self._num_pos)]
         argmax_score, max_score = max(scores.items(), key=lambda x: x[1])
         # argmax_score = np.argmax(scores)
         return max_score, argmax_score
@@ -150,10 +155,9 @@ class MleExtractor:
 
 
 class MleEstimator:
-    def __init__(self, source_file, num_prefix=120, num_suffix=200, delta=(0.2, 0.5, 0.3), gamma=(1, 1)):
+    def __init__(self, source_file, num_prefix=120, num_suffix=200, delta=(0.2, 0.5, 0.3)):
         self._logger = PrintLogger("NLP-ass1")
         self._delta = delta
-        self._gamma = gamma
         self._source = source_file
         self._num_prefix = num_prefix
         self._num_suffix = num_suffix

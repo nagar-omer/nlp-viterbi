@@ -22,6 +22,7 @@ if __name__ == "__main__":
 
 
     src_file = open(input_file_name, "rt")  # open file
+    out_file = open(out_file_name, "wt")
     tagger = ViterbiAlg(me._pos_list, me.prob_func)
     for line in src_file:
         # ---------- BREAK -----------
@@ -32,10 +33,14 @@ if __name__ == "__main__":
             seq.append(word)
             label.append(pos)
         pred = tagger.pred_viterbi(seq, log=True)  # predict
+        for i, word in enumerate(seq):
+            out_file.write(word + "/" + str(pred[i]) + " ")
+        out_file.write("\n")
 
         # print results
         identical = sum([1 for p, l in zip(pred, label) if p == l])
         recall = str(int(identical / len(pred) * 100))
         print("pred: " + str(pred) + "\nlabel: " + str(label) +
               "\nrecall:\t" + str(identical) + "/" + str(len(pred)) + "\t~" + recall + "%")
+
 
